@@ -116,6 +116,81 @@ Basic statistics show that the dataset contains relatively short input sequences
 
 ---
 
+## Vocabulary / token representation
+
+I use a simple vocabulary-based token representation rather than subword tokenisation.
+
+Reason:
+- COGS is a clean and controlled benchmark
+- the target logical forms contain meaningful punctuation and symbolic structure
+- whitespace tokenisation keeps the preprocessing simple and interpretable
+- this is sufficient for a coursework comparison between an LSTM and a Transformer
+
+Two vocabularies are built from the training split only:
+- source vocabulary for input sentences
+- target vocabulary for logical forms
+
+Special tokens:
+- <pad> for batching
+- <bos> for sequence start
+- <eos> for sequence end
+- <unk> for unseen tokens
+
+## Vocabulary / token representation
+
+I use a simple vocabulary-based representation rather than subword tokenisation.
+
+Reason:
+- COGS is a clean and controlled benchmark
+- the target logical forms contain meaningful punctuation and symbolic structure
+- whitespace tokenisation keeps the preprocessing simple and interpretable
+- this is sufficient for a coursework comparison between an LSTM and a Transformer
+
+Two vocabularies are built from the training split only:
+- source vocabulary for input sentences
+- target vocabulary for logical forms
+
+Special tokens:
+- `<pad>` for batching
+- `<bos>` for sequence start
+- `<eos>` for sequence end
+- `<unk>` for unseen tokens
+
+### What the special tokens do
+
+`<pad>`  
+Used to pad shorter sequences so that all examples in a batch have the same length. This is necessary because PyTorch expects batched inputs to have a consistent shape.
+
+Example:  
+- Sentence 1: `Liam smiled .`  
+- Sentence 2: `Emma said that Noah laughed .`
+
+After padding, the shorter sequence might become:  
+`Liam smiled . <pad> <pad> <pad>`
+
+This lets both examples sit inside the same batch tensor.
+
+`<bos>`  
+Marks the beginning of a sequence. In a seq2seq setup, this gives the decoder a fixed starting point before it begins generating the target logical form.
+
+Example target:  
+`<bos> hope ( agent = Liam , ccomp = burn ( theme = box , agent = girl ) ) <eos>`
+
+`<eos>`  
+Marks the end of a sequence. This tells the model where the output should stop during decoding.
+
+Example:  
+If the model generates  
+`hope ( agent = Liam ) <eos>`  
+then decoding stops when `<eos>` is produced.
+
+`<unk>`  
+Used for tokens that were not seen in the training vocabulary. This gives the model a fallback token for unseen items rather than failing to encode them.
+
+Example:  
+If the word `Olivia` appears in test data but was not seen in training, it may be encoded as:  
+`<unk>`
+
 ## Things to write later
 - exact preprocessing choices
 - vocabulary size
