@@ -191,6 +191,104 @@ Example:
 If the word `Olivia` appears in test data but was not seen in training, it may be encoded as:  
 `<unk>`
 
+## Extra observations from random examples
+
+Several examples show that the task is not just subject-verb-object mapping.
+
+Examples:
+- `The cloud was known .` → `know ( theme = * cloud )`
+- `Aiden was given a cake .` → `give ( recipient = Aiden , theme = cake )`
+- `Penelope ate the cake in the house .` → `eat ( agent = Penelope , theme = * cake ( nmod . in = * house ) )`
+
+Observations:
+- passive constructions appear in both train and evaluation splits
+- the model must recover semantic roles even when surface syntax changes
+- some outputs include modifier attachment, such as `nmod . in = * house`
+- this suggests the challenge is structural mapping rather than long text processing
+
+
+## Vocab test
+
+I ran a small test to check whether the vocabulary pipeline works correctly on a real COGS example before moving on to batching and model training.
+
+### Example used
+
+**Source sentence**  
+`A rose was helped by a dog .`
+
+**Target logical form**  
+`help ( theme = rose , agent = dog )`
+
+### What the test checked
+
+The test verified that the vocabulary class can:
+
+- build a source vocabulary from the training `source` field
+- build a target vocabulary from the training `target` field
+- encode both source and target text into integer token IDs
+- decode those IDs back into readable text
+
+### Result
+
+The source sentence encoded and decoded correctly.
+
+Decoded source:  
+`A rose was helped by a dog .`
+
+The target logical form also encoded and decoded correctly.
+
+Decoded target:  
+`help ( theme = rose , agent = dog )`
+
+This means the token-to-id mapping and id-to-token mapping are working as expected.
+
+### Vocabulary sizes
+
+- **Source vocabulary size:** 747
+- **Target vocabulary size:** 662
+
+### Interpretation of the vocabulary sizes
+
+The vocabularies are relatively compact. This is consistent with COGS being a controlled benchmark rather than an open-domain corpus.
+
+This suggests that the main challenge of the task is **not** handling a huge vocabulary. Instead, the difficulty lies in learning the mapping from sentence structure to logical-form structure.
+
+### Interpreting the example
+
+The sentence is in the **passive voice**:
+
+`A rose was helped by a dog .`
+
+Even though **rose** appears first in the sentence, it is not the one carrying out the action.  
+The phrase **“by a dog”** shows that the **dog** is the one doing the helping.
+
+The target logical form makes this explicit:
+
+`help ( theme = rose , agent = dog )`
+
+This means:
+
+- `help` is the main event / predicate
+- `agent = dog` means the dog performs the action
+- `theme = rose` means the rose is the entity affected by the action
+
+So the logical form is not preserving surface word order.  
+Instead, it is preserving the underlying meaning of the sentence.
+
+### Why this matters
+
+This test helped confirm two important things:
+
+1. The vocabulary pipeline is working correctly.
+2. The task requires the model to recover **semantic roles** rather than rely on simple word order.
+
+A model cannot solve this kind of example by assuming that the first noun is always the agent.  
+This makes the task a genuine semantic parsing problem rather than simple pattern matching.
+
+### What this means for the next step
+
+Since encoding and decoding are working correctly, the next step is to use these vocabularies inside a PyTorch dataset wrapper and padded dataloader so that batches can be passed into the LSTM baseline.
+
 ## Things to write later
 - exact preprocessing choices
 - vocabulary size
