@@ -1,5 +1,6 @@
 from datasets import load_dataset
 from statistics import mean
+import random
 
 
 def load_cogs():
@@ -13,18 +14,25 @@ def load_cogs():
     return ds
 
 
-def print_dataset_overview(ds):
+def print_dataset_overview(ds,  n_examples=3, seed=42):
     """
     Print available splits and one example from each split
     so we can inspect the structure of the data.
     """
+    random.seed(seed)
     print("Available splits:", list(ds.keys()))
 
     for split_name in ds.keys():
+        split = ds[split_name]
         print(f"\n--- Split: {split_name} ---")
-        print(f"Number of examples: {len(ds[split_name])}")
-        print("Example 0:")
-        print(ds[split_name][0])
+        print(f"Number of examples: {len(split)}")
+
+        # Sample random indices without replacement
+        chosen_indices = random.sample(range(len(split)), k=min(n_examples, len(split)))
+
+        for idx in chosen_indices:
+            print(f"\nExample {idx}:")
+            print(split[idx])
 
 
 def get_text_lengths(split, source_key, target_key):
