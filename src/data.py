@@ -1,6 +1,8 @@
 from datasets import load_dataset
 from statistics import mean
 import random
+from NLPProject.src.vocab import Vocab
+from vocab.py import Vocabulary
 
 
 def load_cogs():
@@ -75,6 +77,17 @@ def describe_split(split, source_key, target_key):
             "min_tgt_len": min(tgt_lengths),
     }
 
+def build_vocabs(train_split):
+    """
+    Build separate source and target vocabularies from the training split only.
+    """
+    src_vocab = Vocab()
+    tgt_vocab = Vocab()
+
+    src_vocab.build_from_texts(train_split["source"])
+    tgt_vocab.build_from_texts(train_split["target"])
+
+    return src_vocab, tgt_vocab
 
 def main():
     ds = load_cogs()
