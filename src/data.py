@@ -1,8 +1,10 @@
 from datasets import load_dataset
 from statistics import mean
 import random
-from NLPProject.src.vocab import Vocab
-from vocab.py import Vocabulary
+
+from vocab import Vocab
+import torch
+from torch.utils.data import Dataset, DataLoader
 
 
 def load_cogs():
@@ -89,11 +91,103 @@ def build_vocabs(train_split):
 
     return src_vocab, tgt_vocab
 
+class COGSDataset(Dataset):
+    """
+    PyTorch dataset wrapper for one COGS split.
+
+    Each example returns:
+    - raw source text
+    - raw target text
+    - encoded source ids
+    - encoded target ids
+    """
+
+    def __init__(self, hf_split, src_vocab, tgt_vocab):
+        self.examples = hf_split
+        self.src_vocab = src_vocab
+        self.tgt_vocab = tgt_vocab
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getitem__(self, idx):
+        item = self.examples[idx]
+
+        src_ids = self.src_vocab.encode(item["source"], add_bos=True, add_eos=True)
+        tgt_ids = self.tgt_vocab.encode(item["target"], add_bos=True, add_eos=True)
+
+        return {
+            "source_text": item["source"],
+            "target_text": item["target"],
+            "src_ids": torch.tensor(src_ids, dtype=torch.long),
+            "tgt_ids": torch.tensor(tgt_ids, dtype=torch.long),
+        }
+
+
+def collate_fn(batch, src_pad_id, tgt_pad_id):
+    """
+    Pad variable-length source and target sequences so they can be batched.
+    """
+    src_seqs = [item["src_ids"] for item in batch]
+    tgt_seqs = [item["tgt_ids"] for item in batch]
+
+    src_padded = torch.nn.utils.rnn.pad_sequence(
+        src_seqs, batch_first=True, padding_value=src_pad_id
+    )
+    tgt_padded = torch.nn.utils.rnn.pad_sequence(
+        tgt_seqs, batch_first=True, padding_value=tgt_pad_id
+    )
+
+    return {
+        "source_text": [item["source_text"] for item in batch],
+        "target_text": [item["target_text"] for item in batch],
+        "src_ids": src_padded,
+        "tgt_ids": tgt_padded,
+    }
+
+
+def make_dataloaders(ds, batch_size=32):
+    """
+    Build train/dev/test dataloaders and return them together with the vocabularies.
+    """
+    train_split = ds["train"]
+    dev_split = ds["dev"]
+    test_split = ds["test"]
+
+    src_vocab, tgt_vocab = build_vocabs(train_split)
+
+    train_dataset = COGSDataset(train_split, src_vocab, tgt_vocab)
+    dev_dataset = COGSDataset(dev_split, src_vocab, tgt_vocab)
+    test_dataset = COGSDataset(test_split, src_vocab, tgt_vocab)
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=lambda batch: collate_fn(batch, src_vocab.pad_id, tgt_vocab.pad_id),
+    )
+
+    dev_loader = DataLoader(
+        dev_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        collate_fn=lambda batch: collate_fn(batch, src_vocab.pad_id, tgt_vocab.pad_id),
+    )
+
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        collate_fn=lambda batch: collate_fn(batch, src_vocab.pad_id, tgt_vocab.pad_id),
+    )
+
+    return train_loader, dev_loader, test_loader, src_vocab, tgt_vocab
+
+
 def main():
     ds = load_cogs()
-    print_dataset_overview(ds)
 
-    # Update these once you confirm the real column names from the printed example.
+    # Quick stats summary
     source_key = "source"
     target_key = "target"
 
@@ -103,6 +197,21 @@ def main():
         print(f"\n{split_name}:")
         for key, value in stats.items():
             print(f"  {key}: {value}")
+
+    train_loader, dev_loader, test_loader, src_vocab, tgt_vocab = make_dataloaders(ds)
+
+    # Quick sanity check on one batch
+    batch = next(iter(train_loader))
+
+    print("\n=== Batch sanity check ===")
+    print("src_ids shape:", batch["src_ids"].shape)
+    print("tgt_ids shape:", batch["tgt_ids"].shape)
+    print("First source text:", batch["source_text"][0])
+    print("First target text:", batch["target_text"][0])
+    print("Decoded source:", src_vocab.decode(batch["src_ids"][0].tolist()))
+    print("Decoded target:", tgt_vocab.decode(batch["tgt_ids"][0].tolist()))
+    print("Source vocab size:", len(src_vocab))
+    print("Target vocab size:", len(tgt_vocab))
 
 
 if __name__ == "__main__":

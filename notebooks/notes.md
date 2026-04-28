@@ -350,3 +350,56 @@ This confirms that the preprocessing pipeline is ready to support model training
 - training setup for Transformer
 - results table
 - error categories
+
+
+## LSTM sanity check
+
+I added a simple LSTM encoder-decoder baseline and ran a forward-pass sanity check on one batch from the COGS dataloader.
+
+### What the test checked
+
+The test verified that:
+- the model can accept padded source and target batches
+- the forward pass runs without crashing
+- the output tensor has the expected shape
+- greedy decoding also runs mechanically
+
+### Output
+
+- `src_ids shape: torch.Size([8, 14])`
+- `tgt_ids shape: torch.Size([8, 29])`
+- `model output shape: torch.Size([8, 29, 662])`
+- `decoded shape: torch.Size([8, 20])`
+
+### Interpretation
+
+This means the encoder-decoder model is wired correctly.
+
+The model output shape matches the expected seq2seq format:
+- batch size = 8
+- target length = 29
+- target vocabulary size = 662
+
+So for each example and each target position, the model is producing a score over the full target vocabulary.
+
+### Example from the batch
+
+**Source sentence**  
+`A box was rented to Logan .`
+
+**Gold target**  
+`rent ( theme = box , recipient = Logan )`
+
+**Greedy decoded output before training**  
+`cart Hannah change Oliver molecule Avery Avery split tv floor dance dance dance snap Andrew coin cockroach Ella stutter`
+
+### Why the decoded output is nonsense
+
+This is expected because the model has not been trained yet. The weights are still random, so the decoder is just producing arbitrary target-side tokens.
+
+The important result here is not the quality of the decoded sequence, but the fact that:
+- the model runs end to end
+- the output dimensions are correct
+- greedy decoding works
+
+This means the baseline architecture is ready for training.
