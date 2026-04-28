@@ -289,6 +289,59 @@ This makes the task a genuine semantic parsing problem rather than simple patter
 
 Since encoding and decoding are working correctly, the next step is to use these vocabularies inside a PyTorch dataset wrapper and padded dataloader so that batches can be passed into the LSTM baseline.
 
+
+## Batch sanity check
+
+I extended the preprocessing pipeline so that COGS examples can now be turned into padded PyTorch batches.
+
+### What this step does
+
+At this stage, the pipeline can:
+
+- load the COGS dataset
+- compute basic split statistics
+- build separate source and target vocabularies from the training split
+- encode source sentences and target logical forms into token IDs
+- add `<bos>` and `<eos>` markers
+- pad variable-length sequences inside a batch using `<pad>`
+
+### Batch sanity check result
+
+Output:
+- `src_ids shape: torch.Size([32, 14])`
+- `tgt_ids shape: torch.Size([32, 27])`
+
+This means:
+- the batch size is 32
+- the longest source sequence in this batch had length 14 after adding sequence boundary tokens
+- the longest target sequence in this batch had length 27 after adding sequence boundary tokens
+
+So the padding step is working as intended.
+
+### Example from the batch
+
+**Source text**  
+`The cake broke .`
+
+**Target text**  
+`break ( theme = * cake )`
+
+**Decoded source**  
+`The cake broke .`
+
+**Decoded target**  
+`break ( theme = * cake )`
+
+### Interpretation
+
+This is a useful sanity check because it shows that the encoded sequences can be padded into tensors and then decoded back into readable text without losing the original structure. In other words, the preprocessing pipeline is not corrupting the sentence or the logical form.
+
+The example also shows the nature of the task clearly. The sentence is short, but the target still makes the semantic role explicit by identifying `cake` as the `theme` of the `break` event. This again suggests that the difficulty of the task lies in structured meaning mapping rather than in long input sequences.
+
+### Why this matters for the next step
+
+This confirms that the preprocessing pipeline is ready to support model training. The next stage is to feed these padded source and target batches into the LSTM encoder-decoder baseline.
+
 ## Things to write later
 - exact preprocessing choices
 - vocabulary size
