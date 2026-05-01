@@ -1477,3 +1477,218 @@ I added a Transformer encoder-decoder model and ran a forward-pass sanity check 
 This confirms that the Transformer accepts padded source and target batches, produces an output tensor in the expected seq2seq format, and supports greedy decoding at inference time.
 
 As expected, the generated output was not meaningful at this stage because the model is still untrained. The purpose of this check was only to confirm that the Transformer is wired correctly and is ready for training.
+
+## Transformer hyperparameters and intuition
+
+The Transformer uses a small encoder-decoder configuration so that the comparison with the LSTM remains fair and interpretable.
+
+Main hyperparameters:
+- `emb_dim`: size of the token and hidden representations
+- `nhead`: number of attention heads
+- `num_encoder_layers`: number of stacked encoder blocks
+- `num_decoder_layers`: number of stacked decoder blocks
+- `dim_feedforward`: hidden size of the feedforward layer inside each Transformer block
+- `dropout`: regularisation strength
+- `lr`: learning rate
+- `batch_size`: number of examples per update
+- `max_decode_len`: maximum output length during greedy decoding
+
+Initial values:
+- `emb_dim=128`
+- `nhead=4`
+- `num_encoder_layers=2`
+- `num_decoder_layers=2`
+- `dim_feedforward=256`
+- `dropout=0.2`
+- `lr=0.0005`
+- `batch_size=32`
+
+Reasoning:
+These choices keep the Transformer relatively small and comparable to the LSTM baseline, while still allowing multi-head attention and a real encoder-decoder structure. The model is large enough to capture structured dependencies but not so large that it becomes unnecessarily difficult to train on COGS.
+
+
+## First Transformer training run
+
+The first Transformer run trained much faster than the LSTM baseline in the early epochs and reached a best development exact-match score of 0.8310 at epoch 7.
+
+Best result:
+- best epoch = 7
+- train loss = 0.1447
+- dev loss = 0.0679
+- dev exact match = 0.8310
+- dev token accuracy = 0.9542
+
+Interpretation:
+The Transformer learned the task quickly and produced a strong development exact-match score within a small number of epochs. However, after the best checkpoint, exact-match performance became less stable and did not continue improving. At this stage, the Transformer is competitive with the corrected LSTM baseline but does not yet clearly outperform it.
+
+Next step:
+Inspect predictions from the best checkpoint and run one small follow-up experiment focused on training stability, most likely a reduced dropout setting.
+
+## Inspection of best Transformer checkpoint
+
+I inspected 15 development examples from the best Transformer checkpoint.
+
+### Overall impression
+
+The Transformer predictions are generally very clean. In this sample, 12 out of 15 predictions were exact. The model handles passive constructions, clausal complements, and simple predicate-argument structure well.
+
+### Examples of exact predictions
+
+**Source**  
+`Liam hoped that a box was burned by a girl .`
+
+**Gold**  
+`hope ( agent = Liam , ccomp = burn ( theme = box , agent = girl ) )`
+
+**Prediction**  
+`hope ( agent = Liam , ccomp = burn ( theme = box , agent = girl ) )`
+
+This shows that the Transformer can recover nested event structure correctly.
+
+---
+
+**Source**  
+`A melon was given to a girl by the guard .`
+
+**Gold**  
+`give ( theme = melon , recipient = girl , agent = * guard )`
+
+**Prediction**  
+`give ( theme = melon , recipient = girl , agent = * guard )`
+
+This shows correct passive role assignment.
+
+---
+
+**Source**  
+`Liam liked that the cake was tossed by Ava .`
+
+**Gold**  
+`like ( agent = Liam , ccomp = toss ( theme = * cake , agent = Ava ) )`
+
+**Prediction**  
+`like ( agent = Liam , ccomp = toss ( theme = * cake , agent = Ava ) )`
+
+This is another strong clausal-complement example.
+
+### Examples of remaining errors
+
+**Source**  
+`The girl offered the weapon beside a machine to a chicken .`
+
+**Gold**  
+`offer ( agent = * girl , theme = * weapon ( nmod . beside = machine ) , recipient = chicken )`
+
+**Prediction**  
+`offer ( agent = * girl , theme = weapon ( nmod . beside = machine ) , recipient = chicken )`
+
+This prediction is nearly correct, but misses the `*` marker before `weapon`.
+
+---
+
+**Source**  
+`Liam painted a box on a table beside the chair .`
+
+**Gold**  
+`paint ( agent = Liam , theme = box ( nmod . on = table ( nmod . beside = * chair ) ) )`
+
+**Prediction**  
+`paint ( agent = Liam , theme = box ( nmod . beside = * table ( nmod . beside = table ) )`
+
+This looks like a modifier attachment error, which is one of the more structurally difficult cases in COGS.
+
+---
+
+**Source**  
+`Mason liked that the cookie was hunted .`
+
+**Gold**  
+`like ( agent = Mason , ccomp = hunt ( theme = * cookie ) )`
+
+**Prediction**  
+`like ( agent = Mason , ccomp = hunt ( theme = * cookie )`
+
+This is almost correct, but the logical form is incomplete because of a missing closing bracket.
+
+### Main takeaway
+
+The Transformer is structurally strong and produces many fully correct logical forms. The remaining errors appear to be mainly small formatting issues and some attachment mistakes, rather than broad failure to recover the semantic frame.
+
+## Final Transformer result
+
+The strongest Transformer run achieved a best development exact-match score of 0.9677 at epoch 19.
+
+Best result:
+- best epoch = 19
+- train loss = 0.0266
+- dev loss = 0.0145
+- dev exact match = 0.9677
+- dev token accuracy = 0.9935
+
+Interpretation:
+This run clearly outperformed the final corrected LSTM baseline on the development set. Unlike the earlier Transformer run, the best exact-match result was not an isolated spike: epochs 18 to 20 all remained around 0.967, which suggests that the model is training stably and that the result is reliable.
+
+Conclusion:
+The Transformer now appears to be the strongest model tested so far. The next step is to keep the epoch 19 checkpoint as the final Transformer model and evaluate both the LSTM and Transformer on the test set.
+
+## Inspection of final Transformer checkpoint
+
+I inspected 15 development examples from the strongest Transformer checkpoint.
+
+### Overall impression
+
+The Transformer predictions are extremely strong. In this sample, 14 out of 15 predictions were exact. The model handles passive constructions, clausal complements, and ordinary predicate-argument mappings very well.
+
+### Examples of exact predictions
+
+**Source**  
+`Liam hoped that a box was burned by a girl .`
+
+**Gold**  
+`hope ( agent = Liam , ccomp = burn ( theme = box , agent = girl ) )`
+
+**Prediction**  
+`hope ( agent = Liam , ccomp = burn ( theme = box , agent = girl ) )`
+
+This shows correct recovery of nested event structure.
+
+---
+
+**Source**  
+`A melon was given to a girl by the guard .`
+
+**Gold**  
+`give ( theme = melon , recipient = girl , agent = * guard )`
+
+**Prediction**  
+`give ( theme = melon , recipient = girl , agent = * guard )`
+
+This shows correct passive role assignment.
+
+---
+
+**Source**  
+`The girl offered the weapon beside a machine to a chicken .`
+
+**Gold**  
+`offer ( agent = * girl , theme = * weapon ( nmod . beside = machine ) , recipient = chicken )`
+
+**Prediction**  
+`offer ( agent = * girl , theme = * weapon ( nmod . beside = machine ) , recipient = chicken )`
+
+This shows correct modifier structure in a more complex example.
+
+### Remaining error example
+
+**Source**  
+`Liam painted a box on a table beside the chair .`
+
+**Gold**  
+`paint ( agent = Liam , theme = box ( nmod . on = table ( nmod . beside = * chair ) ) )`
+
+**Prediction**  
+The prediction starts correctly but then repeats the modifier structure around `chair` and becomes incomplete.
+
+### Interpretation
+
+The dominant remaining weakness appears to be in harder modifier-attachment cases, where the model can still over-generate or attach phrases incorrectly. However, compared with the LSTM baseline, the Transformer now appears much more reliable overall and produces many fully correct logical forms.
