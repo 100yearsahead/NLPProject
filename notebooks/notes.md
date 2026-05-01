@@ -1152,3 +1152,297 @@ The LSTM experiments suggest that:
 - dropout was not the main factor driving performance in this setup
 
 The most important lesson is that the model’s behaviour had to be interpreted through both metrics and inspected predictions. Looking only at exact match would have hidden the fact that the model was often producing nearly correct or fully correct logical forms.
+
+One issue identified in the initial LSTM implementation was that batched greedy decoding only stopped when all sequences in the batch predicted `<eos>`. This meant that sequences which had already finished could continue generating extra tokens, which likely contributed to over-generation errors such as repeated closing brackets. The decoding function was therefore updated to track finished sequences individually.
+
+The important catch
+
+Your draft currently says:
+
+“Bahdanau, Cho and Bengio (2015) showed that attention improves encoder-decoder models...”
+
+That is fine in the related work section.
+
+But your actual implemented LSTM is not Bahdanau attention.
+It is a plain seq2seq LSTM.
+
+So you should be careful not to imply that your baseline uses attention if it does not.
+
+
+## Final corrected LSTM run
+
+After fixing the batched greedy-decoding issue, I reran the strongest LSTM configuration.
+
+Best result:
+- best epoch = 29
+- train loss = 0.0378
+- dev loss = 0.1080
+- dev exact match = 0.8440
+- dev token accuracy = 0.9866
+
+Interpretation:
+The corrected run produced a smooth and believable training curve. Development exact-match accuracy increased steadily across epochs, which suggests that the earlier unstable sequence-level behaviour was largely caused by the decoding bug rather than by the model itself. This corrected LSTM run is therefore a much more reliable baseline.
+
+Conclusion:
+The hidden-dimension-128 LSTM checkpoint from epoch 29 will be kept as the final recurrent baseline for comparison against the Transformer model.
+
+
+================================================================================
+Example 1
+SOURCE:
+Liam hoped that a box was burned by a girl .
+
+GOLD:
+hope ( agent = Liam , ccomp = burn ( theme = box , agent = girl ) )
+
+PRED:
+hope ( agent = Liam , ccomp = burn ( theme = box , agent = girl ) )
+
+================================================================================
+Example 2
+SOURCE:
+The donkey lended the cookie to a mother .
+
+GOLD:
+lend ( agent = * donkey , theme = * cookie , recipient = mother )
+
+PRED:
+lend ( agent = * donkey , theme = * key , recipient = driver )
+
+================================================================================
+Example 3
+SOURCE:
+A melon was given to a girl by the guard .
+
+GOLD:
+give ( theme = melon , recipient = girl , agent = * guard )
+
+PRED:
+give ( theme = melon , recipient = girl , agent = * driver )
+
+================================================================================
+Example 4
+SOURCE:
+A donut was given to a butterfly .
+
+GOLD:
+give ( theme = donut , recipient = butterfly )
+
+PRED:
+give ( theme = donut , recipient = butterfly )
+
+================================================================================
+Example 5
+SOURCE:
+A rose was mailed to Isabella .
+
+GOLD:
+mail ( theme = rose , recipient = Isabella )
+
+PRED:
+mail ( theme = rose , recipient = Isabella )
+
+================================================================================
+Example 6
+SOURCE:
+The girl offered the weapon beside a machine to a chicken .
+
+GOLD:
+offer ( agent = * girl , theme = * weapon ( nmod . beside = machine ) , recipient = chicken )
+
+PRED:
+offer ( agent = * girl , theme = * weapon ( nmod . beside = bed ) , recipient = chicken )
+
+================================================================================
+Example 7
+SOURCE:
+A donut was touched by Emma .
+
+GOLD:
+touch ( theme = donut , agent = Emma )
+
+PRED:
+touch ( theme = donut , agent = Emma )
+
+================================================================================
+Example 8
+SOURCE:
+Liam painted a box on a table beside the chair .
+
+GOLD:
+paint ( agent = Liam , theme = box ( nmod . on = table ( nmod . beside = * chair ) ) )
+
+PRED:
+paint ( agent = Liam , theme = box ( nmod . on = table ( nmod . beside = * chair ) ) )
+
+================================================================================
+Example 9
+SOURCE:
+Emma ate a hammer .
+
+GOLD:
+eat ( agent = Emma , theme = hammer )
+
+PRED:
+eat ( agent = Emma , theme = hammer )
+
+================================================================================
+Example 10
+SOURCE:
+A drink was juggled .
+
+GOLD:
+juggle ( theme = drink )
+
+PRED:
+juggle ( theme = drink )
+
+================================================================================
+Example 11
+SOURCE:
+Liam liked that the cake was tossed by Ava .
+
+GOLD:
+like ( agent = Liam , ccomp = toss ( theme = * cake , agent = Ava ) )
+
+PRED:
+like ( agent = Liam , ccomp = toss ( theme = * cake , agent = Ava ) )
+
+================================================================================
+Example 12
+SOURCE:
+The box was found by Hannah .
+
+GOLD:
+find ( theme = * box , agent = Hannah )
+
+PRED:
+find ( theme = * box , agent = Hannah )
+
+================================================================================
+Example 13
+SOURCE:
+Ava forwarded a chalk to a girl .
+
+GOLD:
+forward ( agent = Ava , theme = chalk , recipient = girl )
+
+PRED:
+forward ( agent = Ava , theme = chalk , recipient = girl )
+
+================================================================================
+Example 14
+SOURCE:
+Mason liked that the cookie was hunted .
+
+GOLD:
+like ( agent = Mason , ccomp = hunt ( theme = * cookie ) )
+
+PRED:
+like ( agent = Mason , ccomp = hunt ( theme = * cookie ) )
+
+================================================================================
+Example 15
+SOURCE:
+A monkey ran .
+
+GOLD:
+run ( agent = monkey )
+
+PRED:
+run ( agent = monkey )
+
+## Final LSTM checkpoint inspection
+
+I inspected 15 development examples from the corrected best LSTM checkpoint.
+
+### Overall impression
+
+The predictions are much cleaner than in the earlier inspected run. In particular:
+- the repeated extra `)` problem is no longer visible
+- many outputs are now fully exact
+- the main remaining errors are lexical substitutions rather than structural collapse
+
+From this sample, 11 out of 15 predictions were exact.
+
+### Examples of exact predictions
+
+**Source**  
+`Liam hoped that a box was burned by a girl .`
+
+**Gold**  
+`hope ( agent = Liam , ccomp = burn ( theme = box , agent = girl ) )`
+
+**Prediction**  
+`hope ( agent = Liam , ccomp = burn ( theme = box , agent = girl ) )`
+
+This shows the model can recover nested event structure correctly.
+
+---
+
+**Source**  
+`Liam painted a box on a table beside the chair .`
+
+**Gold**  
+`paint ( agent = Liam , theme = box ( nmod . on = table ( nmod . beside = * chair ) ) )`
+
+**Prediction**  
+`paint ( agent = Liam , theme = box ( nmod . on = table ( nmod . beside = * chair ) ) )`
+
+This shows the model can also handle modifier attachment correctly.
+
+---
+
+**Source**  
+`Liam liked that the cake was tossed by Ava .`
+
+**Gold**  
+`like ( agent = Liam , ccomp = toss ( theme = * cake , agent = Ava ) )`
+
+**Prediction**  
+`like ( agent = Liam , ccomp = toss ( theme = * cake , agent = Ava ) )`
+
+This is another strong clausal-complement example.
+
+### Examples of remaining errors
+
+**Source**  
+`The donkey lended the cookie to a mother .`
+
+**Gold**  
+`lend ( agent = * donkey , theme = * cookie , recipient = mother )`
+
+**Prediction**  
+`lend ( agent = * donkey , theme = * key , recipient = driver )`
+
+The overall structure is correct, but the model substitutes the wrong lexical items.
+
+---
+
+**Source**  
+`A melon was given to a girl by the guard .`
+
+**Gold**  
+`give ( theme = melon , recipient = girl , agent = * guard )`
+
+**Prediction**  
+`give ( theme = melon , recipient = girl , agent = * driver )`
+
+Again, the predicate and role structure are correct, but the final entity is wrong.
+
+---
+
+**Source**  
+`The girl offered the weapon beside a machine to a chicken .`
+
+**Gold**  
+`offer ( agent = * girl , theme = * weapon ( nmod . beside = machine ) , recipient = chicken )`
+
+**Prediction**  
+`offer ( agent = * girl , theme = * weapon ( nmod . beside = bed ) , recipient = chicken )`
+
+Here the modifier structure is preserved, but one lexical item inside it is wrong.
+
+### Main takeaway
+
+The corrected LSTM baseline now appears to learn the target logical-form structure reliably. The dominant remaining weakness is lexical substitution inside an otherwise correct structure, rather than output-format instability or major structural failure.
