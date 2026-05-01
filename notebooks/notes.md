@@ -1446,3 +1446,17 @@ Here the modifier structure is preserved, but one lexical item inside it is wron
 ### Main takeaway
 
 The corrected LSTM baseline now appears to learn the target logical-form structure reliably. The dominant remaining weakness is lexical substitution inside an otherwise correct structure, rather than output-format instability or major structural failure.
+
+## Why greedy decoding was used
+
+Since this project is a sequence-to-sequence generation task, I needed an inference procedure at evaluation time to turn model outputs into full logical forms. During training, the model sees the gold target prefix, but at evaluation time it has to generate the target sequence using its own previous predictions. Greedy decoding provides a simple and standard way to do this.
+
+In greedy decoding, the model starts from the `<bos>` token and generates one token at a time. At each step, it chooses the single most likely next token, appends it to the sequence, and then uses that token as part of the next decoder input. Generation stops when `<eos>` is produced or when a maximum decode length is reached.
+
+I used greedy decoding because:
+- it is a standard baseline inference method for seq2seq models
+- it is simple to implement and explain
+- it can be used consistently for both the LSTM and Transformer
+- it allows direct evaluation of fully generated logical forms using exact match and token accuracy
+
+This was especially important in this project because token-level metrics alone did not fully reflect model behaviour. Greedy decoding made it possible to inspect actual generated logical forms and identify sequence-level issues such as over-generation, stopping errors, and lexical substitutions.
