@@ -1692,3 +1692,55 @@ The prediction starts correctly but then repeats the modifier structure around `
 ### Interpretation
 
 The dominant remaining weakness appears to be in harder modifier-attachment cases, where the model can still over-generate or attach phrases incorrectly. However, compared with the LSTM baseline, the Transformer now appears much more reliable overall and produces many fully correct logical forms.
+
+## Final test evaluation plan
+
+The final evaluation will be done on the full official COGS test split for both the final LSTM and final Transformer checkpoints.
+
+In addition to overall test exact match and token accuracy, I will create structure-tagged subsets within the same test split for:
+- passive constructions
+- clausal complements
+- modifier attachment
+
+These subsets are not new benchmark splits. They are filtered subsets of the official test set used for targeted analysis of the structures discussed in the hypothesis.
+
+## Final LSTM test evaluation
+
+The final corrected LSTM baseline was evaluated on the full official COGS test split.
+
+### Overall test results
+- exact match = 0.8397
+- token accuracy = 0.9853
+
+### Structure-tagged subsets of the test set
+- passive exact match = 0.8473 (n = 884)
+- clausal complement exact match = 0.6712 (n = 441)
+- modifier attachment exact match = 0.5732 (n = 656)
+
+### Interpretation
+
+The LSTM baseline performs strongly overall and is especially strong on passive constructions. However, performance drops on clausal complements and drops further on modifier attachment examples. This suggests that the recurrent baseline handles simpler role reassignment better than more complex nested or attachment-sensitive structures.
+
+This pattern is consistent with the idea that exact semantic role recovery in passives is easier than maintaining correct structure in examples with embedded events or more complex modifier attachment.
+
+## Final model comparison on the official test set
+
+### LSTM
+- overall exact match = 0.8397
+- token accuracy = 0.9853
+- passive exact match = 0.8473 (n = 884)
+- clausal complement exact match = 0.6712 (n = 441)
+- modifier attachment exact match = 0.5732 (n = 656)
+
+### Transformer
+- overall exact match = 0.9600
+- token accuracy = 0.9930
+- passive exact match = 0.9717 (n = 884)
+- clausal complement exact match = 0.8889 (n = 441)
+- modifier attachment exact match = 0.8582 (n = 656)
+
+### Interpretation
+
+The Transformer clearly outperforms the LSTM on the full official test set and on all three structure-tagged subsets. Both models are strongest on passive constructions and weaker on clausal complements and modifier attachment, but the Transformer shows a much smaller drop on these harder structures.
+
+This supports the original hypothesis that self-attention would provide an advantage on examples where the correct semantic mapping depends on non-local or more structured relationships. The results suggest that the Transformer handles nested and attachment-sensitive structures more reliably than the recurrent baseline.
