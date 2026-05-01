@@ -1460,3 +1460,20 @@ I used greedy decoding because:
 - it allows direct evaluation of fully generated logical forms using exact match and token accuracy
 
 This was especially important in this project because token-level metrics alone did not fully reflect model behaviour. Greedy decoding made it possible to inspect actual generated logical forms and identify sequence-level issues such as over-generation, stopping errors, and lexical substitutions.
+
+## Transformer sanity check
+
+I added a Transformer encoder-decoder model and ran a forward-pass sanity check on one batch from the COGS dataloader.
+
+### Output
+
+- `src_ids shape: torch.Size([8, 15])`
+- `tgt_ids shape: torch.Size([8, 28])`
+- `model output shape: torch.Size([8, 28, 662])`
+- `decoded shape: torch.Size([8, 20])`
+
+### Interpretation
+
+This confirms that the Transformer accepts padded source and target batches, produces an output tensor in the expected seq2seq format, and supports greedy decoding at inference time.
+
+As expected, the generated output was not meaningful at this stage because the model is still untrained. The purpose of this check was only to confirm that the Transformer is wired correctly and is ready for training.
