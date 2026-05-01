@@ -122,19 +122,30 @@ class Seq2Seq(nn.Module):
 
         decoded_tokens = [input_token]
 
+        # keep track of which sequences have already predicted <eos>
+        finished = torch.zeros(batch_size, dtype=torch.bool, device=self.device)
+
         for _ in range(max_len - 1):
             prediction, hidden, cell = self.decoder(input_token, hidden, cell)
 
-            input_token = prediction.argmax(1)
-            decoded_tokens.append(input_token)
+            next_token = prediction.argmax(1)
 
-            # stop early if everything in batch predicted <eos>
-            if torch.all(input_token == eos_id):
+            # once a sequence is finished, keep it at <eos>
+            next_token = torch.where(finished, torch.full_like(next_token, eos_id), next_token)
+
+            decoded_tokens.append(next_token)
+
+            # update finished mask
+            finished = finished | (next_token == eos_id)
+
+            # next decoder input
+            input_token = next_token
+
+            # now we can stop if every sequence is finished
+            if torch.all(finished):
                 break
 
-        # [decoded_len, batch_size] -> [batch_size, decoded_len]
         decoded_tokens = torch.stack(decoded_tokens, dim=1)
-
         return decoded_tokens
 
 
