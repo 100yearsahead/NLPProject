@@ -200,7 +200,7 @@ def main():
             f"dev_token_acc={dev_token_acc:.4f}"
         )
 
-        # save one row per epoch
+        # save one row per epoch use dev loss instead of val loss as this is the formalism they use in this dataset
         append_metrics_row(
             metrics_path,
             {
